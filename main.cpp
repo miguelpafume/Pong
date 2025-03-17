@@ -2,22 +2,29 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-//Vertex shader literal string
-const char* vertexShaderSource = "#version 460 core\n"
-"layout (location = 0) in vec3 aPos;\n"
-"void main() {\n"
-"   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-"}\0";
-
-//Vertex shader literal string
-const char* fragmentShaderSource = "#version 460 core\n"
-"out vec4 FragColor;\n"
-"void main() {\n"
-"   FragColor = vec4(0.8f, 0.3f, 0.02f, 1.0f);\n"
-"}\n\0";
+#include "ShaderClass.hpp"
+#include "VBO.hpp"
+#include "VAO.hpp"
+#include "EBO.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
+
+//Sets triangles points on screen
+GLfloat vertices[] = {
+	0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f, // TOP
+	-0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, //MIDDLE LEFT
+	0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, //MIDDLE RIGHT
+	-0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f, //BOTTOM LEFT
+	0.0f, -0.5f * float(sqrt(3)) / 3, 0.0f, // BOTTOM MIDDLE
+	0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f //BOTTOM RIGHT
+};
+
+GLuint indices[] = {
+	0, 1, 2,
+	1, 3, 4,
+	2, 4, 5
+};
 
 int main() {
 	//INITIALIZE OPENGL VERSION 4.6 
@@ -25,13 +32,6 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	// Loads and checks for proper loading of GLAD
-	gladLoadGL();
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		std::cout << "Failed to initialize GLAD" << std::endl;
-		return -1;
-	}
 
 	// Set windows to a 800x800 square
 	GLFWwindow* window = glfwCreateWindow(800, 800, "Pong", NULL, NULL);
@@ -46,78 +46,32 @@ int main() {
 		return -1;
 	}
 
-	//Vertex shader compiling
-	GLuint vertexShader;
-	vertexShader = glCreateShader(GL_VERTEX_SHADER);
-
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
-
-	//Checks for vertex shader compilation
-	int  success;
-	char infoLog[512];
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if(!success) {
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+	// Loads and checks for proper loading of GLAD
+	gladLoadGL();
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return -1;
 	}
 
-	//Fragament shader compiling
-	GLuint fragmentShader;
-	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	//Generates the shader object
+	Shader ShaderProgram("default.vert", "default.frag");
 
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
+	//Generates Vertex Array Object and binds it
+	VAO VAO_1;
+	VAO_1.Bind();
 
-	//Checks for fragment shader compiling
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}
+	//Generates Vertex Buffer Object and binds it
+	VBO VBO_1(vertices, sizeof(vertices));
 
-	//Shader Program
-	GLuint shaderProgram;
-	shaderProgram = glCreateProgram();
+	//Generates Element Buffer Object and binds it
+	EBO EBO_1(indices, sizeof(indices));
 
-	//Attaches previous shader to shader program
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
+	VAO_1.LinkVBO(VBO_1, 0);
 
-	//Checks for shader program
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(shaderProgram, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}
-
-	//Delete vertex and fragment shader from memory
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	//Sets triangles points on screen
-	GLfloat verticies[] = {
-		0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f,
-		0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,
-		-0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f
-	};
-
-	//Vertex buffer and array objects
-	GLuint VAO, VBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
+	//Unbind all previous objects
+	VAO_1.Unbind();
+	VBO_1.Unbind();
+	EBO_1.Unbind();
 
 	//Main program loop
 	while (!glfwWindowShouldClose(window)) {
@@ -128,12 +82,23 @@ int main() {
 		glClearColor(1.0f, 0.95f, 0.95f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		float timeValue = glfwGetTime();
+		float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
+		float redValue = (cos(timeValue) / 2.0f) + 0.5f;
+		//float blueValue = (sin(timeValue) / 2.0f) + 0.5f;
+		float blueValue = 0.0f;
+
+		int vertexColorLocation = glGetUniformLocation(ShaderProgram.ID, "triangleColor");
+
 		//Sets the shader program to the previous one made
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
+		ShaderProgram.Activate();
+
+		glUniform4f(vertexColorLocation, redValue, greenValue, blueValue, 1.0f);
+
+		VAO_1.Bind();
 
 		//Draws the triangle
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
 
 		//Check and call events & swap buffers
 		glfwPollEvents();
@@ -141,12 +106,14 @@ int main() {
 	}
 
 	//Properly deletes stuff in memory and exits program
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteProgram(shaderProgram);
+	VAO_1.Delete();
+	VBO_1.Delete();
+	EBO_1.Delete();
+	ShaderProgram.Delete();
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+
 	return 0;
 }
 

@@ -1,17 +1,21 @@
 #include "ShaderClass.hpp"
 
 std::string getFileContent(const char* filename) {
-	std::ifstream in(filename, std::ios::binary);
+	std::ifstream file(filename, std::ios::binary);
 
-	if (in) {
+	if (file) {
 		std::string contents;
-		in.seekg(0, std::ios::end);
-		contents.resize(in.tellg());
-		in.seekg(0, std::ios::beg);
-		in.read(&contents[0], contents.size());
-		in.close();
-		return(contents);
+
+		file.seekg(0, std::ios::end);
+		contents.resize(file.tellg());
+
+		file.seekg(0, std::ios::beg);
+		file.read(&contents[0], contents.size());
+
+		file.close();
+		return contents;
 	}
+
 	throw(errno);
 };
 
@@ -24,7 +28,7 @@ Shader::Shader(const char* vertex_file, const char* fragment_file) {
 	const char* fragment_source = fragment_code.c_str();
 
 	//Vertex shader compiling
-	 GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 
 	glShaderSource(vertex_shader, 1, &vertex_source, NULL);
 	glCompileShader(vertex_shader);
@@ -32,6 +36,7 @@ Shader::Shader(const char* vertex_file, const char* fragment_file) {
 	//Checks for vertex shader compilation
 	int  success;
 	char infoLog[512];
+
 	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
@@ -39,7 +44,7 @@ Shader::Shader(const char* vertex_file, const char* fragment_file) {
 	}
 
 	//Fragament shader compiling
-	 GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
 	glShaderSource(fragment_shader, 1, &fragment_source, NULL);
 	glCompileShader(fragment_shader);
@@ -48,7 +53,7 @@ Shader::Shader(const char* vertex_file, const char* fragment_file) {
 	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}
 
 	//Shader Program
@@ -63,7 +68,7 @@ Shader::Shader(const char* vertex_file, const char* fragment_file) {
 	glGetProgramiv(ID, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(ID, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+		std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
 	}
 
 	//Delete vertex and fragment shader from memory

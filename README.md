@@ -1,6 +1,6 @@
-# Pong
+# Learning OpenGL
 
-Future pong project as I learn OpenGL.
+Repo I use as I learn OpenGL.
 
 -----
 

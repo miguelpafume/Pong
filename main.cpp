@@ -2,27 +2,39 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <stb/stb_image.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>	
+
 
 #include "ShaderClass.hpp"
 #include "VBO.hpp"
 #include "VAO.hpp"
 #include "EBO.hpp"
+#include "Texture.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 
+GLuint SCREEN_WIDTH = 800;
+GLuint SCREEN_HEIGHT = 800;
+
 //Sets triangles points on screen
 GLfloat vertices[] = {
-   -0.5f,  0.5f, 0.0f,		0.0f, 1.0f, //UPPER LEFT
-   -0.5f, -0.5f, 0.0f,		0.0f, 0.0f, //BOTTOM LEFT
-	0.5f, -0.5f, 0.0f,		1.0f, 0.0f, //BOTTOM RIGHT
-	0.5f,  0.5f, 0.0f,		1.0f, 1.0f  //UPPER RIGHT
+   -0.5f,   0.0f,	0.5f,	0.0f, 0.0f, //FRONT LEFT
+	0.5f,   0.0f,	0.5f,	1.0f, 0.0f, //FRONT RIGHT
+   -0.5f,   0.0f,  -0.5f,	1.0f, 0.0f, //BACK LEFT
+	0.5f,	0.0f,  -0.5f,	0.0f, 0.0f, //BACK RIGHT
+	0.0f,	0.8f,   0.0f,	0.5f, 1.0f  //TOP
 };
 
 GLuint indices[] = {
 	0, 1, 2,
-	0, 2, 3
+	1, 3, 2,
+	2, 0, 4,
+	2, 3, 4,
+	0, 1, 4,
+	1, 3, 4
 };
 
 int main() {
@@ -33,7 +45,7 @@ int main() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	// Set windows to a 800x800 square
-	GLFWwindow* window = glfwCreateWindow(800, 800, "Pong", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pong", NULL, NULL);
 
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -65,7 +77,8 @@ int main() {
 	//Generates Element Buffer Object and binds it
 	EBO EBO_1(indices, sizeof(indices));
 
-	VAO_1.LinkVBO(VBO_1, 0);
+	VAO_1.LinkAttrib(VBO_1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
+	VAO_1.LinkAttrib(VBO_1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
 	//Unbind all previous objects
 	VAO_1.Unbind();
@@ -73,26 +86,14 @@ int main() {
 	EBO_1.Unbind();
 
 	//Texture
+	Texture PerryTexture("perry.jpg", GL_TEXTURE_2D, GL_TEXTURE0, GL_RGB, GL_UNSIGNED_BYTE);
+	PerryTexture.textureUnit(ShaderProgram, "tex0", 0);
 
-	int width_img, height_img, col_channels;
-	unsigned char* bytes = stbi_load("perry.jpg", &width_img, &height_img, &col_channels, 0);
 
-	GLuint texture;
-	glGenTextures(1, &texture);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width_img, height_img, 0, GL_RGB, GL_UNSIGNED_BYTE, bytes);
-
-	stbi_image_free(bytes);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	float rotation = 0.0f;
+	double previous_time = glfwGetTime();
+	
+	glEnable(GL_DEPTH_TEST);
 
 	//Main program loop
 	while (!glfwWindowShouldClose(window)) {
@@ -101,7 +102,7 @@ int main() {
 
 		//RENDERING
 		glClearColor(1.0f, 0.95f, 0.95f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		float timeValue = glfwGetTime();
 		float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
@@ -112,14 +113,37 @@ int main() {
 		//Sets the shader program to the previous one made
 		ShaderProgram.Activate();
 
+		double current_time = glfwGetTime();
+		if (current_time - previous_time >= 0.1f / 60.0f) {
+			rotation += 0.5f;
+			previous_time = current_time;
+		}
+
+		glm::mat4 model = glm::mat4(1.0f);
+		glm::mat4 view = glm::mat4(1.0f);
+		glm::mat4 projection = glm::mat4(1.0f);
+
+		model = glm::rotate(model, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+		view = glm::translate(view, glm::vec3(0.0f, -0.5f, -2.0f));
+		projection = glm::perspective(glm::radians(45.0f), (float)(SCREEN_WIDTH / SCREEN_HEIGHT), 0.1f, 100.0f);
+
+		int model_location = glGetUniformLocation(ShaderProgram.ID, "model");
+		glUniformMatrix4fv(model_location, 1, GL_FALSE, glm::value_ptr(model));
+
+		int view_location = glGetUniformLocation(ShaderProgram.ID, "view");
+		glUniformMatrix4fv(view_location, 1, GL_FALSE, glm::value_ptr(view));
+		
+		int projection_location = glGetUniformLocation(ShaderProgram.ID, "projection");
+		glUniformMatrix4fv(projection_location, 1, GL_FALSE, glm::value_ptr(projection));
+
 		glUniform4f(vertexColorLocation, redValue, greenValue, 0.0f, 1.0f);
 
 		VAO_1.Bind();
 
 		//Draws the triangle
-		glBindTexture(GL_TEXTURE_2D, texture);
+		PerryTexture.Bind();
 		glBindVertexArray(VAO_1.ID);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, sizeof(indices)/sizeof(int), GL_UNSIGNED_INT, 0);
 
 		//Check and call events & swap buffers
 		glfwPollEvents();
@@ -132,7 +156,7 @@ int main() {
 	EBO_1.Delete();
 	ShaderProgram.Delete();
 
-	glDeleteTextures(1, &texture);
+	PerryTexture.Delete();
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
